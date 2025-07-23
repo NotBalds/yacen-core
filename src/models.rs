@@ -2,14 +2,12 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
-    user: User,
-    settings: Settings,
+    identity: Identity,
+    known_identities: Vec<Identity>,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct User {
+pub struct Identity {
+    name: String,
     secret: [u8; 32],
 }
-
-#[derive(Serialize, Deserialize)]
-pub struct Settings {}
