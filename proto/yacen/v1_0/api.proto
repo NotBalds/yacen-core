@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package yacen_api.v2;
+package yacen_api.v1_0;
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
