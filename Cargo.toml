@@ -1,0 +1,32 @@
+[package]
+name= "yacen-core"
+version = "0.1.0"
+description = "Core library for yacen, simplifying client development"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/notbalds/yacen-core"
+
+[dependencies]
+prost = { version = "0.13.5", optional = true }
+prost-types = { version = "0.13.5", optional = true }
+tonic = { version = "0.13.1", features = ["transport", "codegen", "tls-native-roots"], optional = true }
+anyhow = { version = "1.0.98", features = ["backtrace"] }
+serde = { version = "1.0.219", features = ["derive"] }
+bincode = { version = "2.0.1", features = ["serde"] }
+ecies = { version = "0.2.9", default-features = false, features = ["aes-rust", "std"], optional = true }
+pbkdf2 = { version = "0.12.2", features = ["simple"], optional = true }
+aes-gcm = { version = "0.10.3", features = ["aes", "arrayvec", "std"], optional = true }
+sha2 = { version = "0.10.9", optional = true }
+ed25519-dalek = { version = "2.2.0", features = ["serde", "rand_core"], optional = true }
+rand_core = { version = "0.9.3", features = ["os_rng", "std"], optional = true }
+bimap = { version = "0.6.3", features = ["serde"] }
+
+[build-dependencies]
+tonic-build = { version = "0.13.1", optional = true }
+
+[features]
+default = ["full"]
+full = ["grpc-api", "security"]
+grpc-api = ["dep:tonic", "dep:tonic-build", "dep:prost", "dep:prost-types"]
+security = ["dep:ecies", "dep:pbkdf2", "dep:aes-gcm", "dep:sha2", "dep:rand_core", "dep:ed25519-dalek"]
