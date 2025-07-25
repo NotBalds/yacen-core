@@ -1,0 +1,163 @@
+syntax = "proto3";
+
+package yacen_api.v1_1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+service Yacen {
+//  TODO: rpc GetServerInfo () returns (GetServerInfoResponse)
+  rpc JoinRoom (JoinRoomRequest) returns (google.protobuf.Empty);
+  rpc CreateRoom (CreateRoomRequest) returns (CreateRoomResponse);
+  rpc GetRoomInfo (GetRoomInfoRequest) returns (GetRoomInfoResponse);
+  rpc DeleteRoom (DeleteRoomRequest) returns (google.protobuf.Empty);
+  
+  rpc SendMessage (SendMessageRequest) returns (google.protobuf.Empty);
+  rpc GetMessagesStream (GetMessagesStreamRequest) returns (stream GetMessagesStreamResponse);
+
+  rpc UploadFile (stream UploadFileRequest) returns (UploadFileResponse);
+  rpc DownloadFile (DownloadFileRequest) returns (stream DownloadFileResponse);
+}
+// --------------------------------------------------------- //
+
+// region Security
+message Ed25519Signature {
+  bytes signature = 1; // 64 bytes Ed25519 signature
+  bytes public_key = 2; // 32 bytes Ed25519 public key for verification
+  google.protobuf.Timestamp timestamp = 3;
+}
+// --------------------------------------------------------- //
+
+// region Room
+message RoomInfo {
+  bytes room_id = 1;
+  RoomType room_type = 2;
+  repeated bytes public_keys = 3;
+}
+
+enum RoomType {
+  ROOM_TYPE_COMMON = 0;
+  ROOM_TYPE_CHANNEL = 1;
+}
+// --------------------------------------------------------- //
+
+// region Message
+message Message {
+  oneof content {
+    bytes text = 1;
+    bytes file_id = 2;
+  };
+  Ed25519Signature signature = 3;
+}
+// --------------------------------------------------------- //
+
+// region File
+message FileInfo {
+  string name = 1;
+}
+
+message FileChunk {
+  int32 chunk_id = 1;
+  int32 chunk_count = 2;
+  oneof payload {
+    FileInfo info = 3;
+    bytes chunk_data = 4;
+  }
+  Ed25519Signature signature = 5;
+}
+// --------------------------------------------------------- //
+
+
+// region JoinRoom
+// Requests to join room
+
+message JoinRoomRequest {
+  bytes room_id = 1;
+  Ed25519Signature signature = 2;
+}
+// --------------------------------------------------------- //
+
+// region CreateRoom
+// Creates new room
+
+message CreateRoomRequest {
+  Ed25519Signature signature = 1;
+}
+
+message CreateRoomResponse {
+  bytes room_id = 1;
+}
+// --------------------------------------------------------- //
+
+// region GetRoomInfo
+// Gets all exists room's info on server
+
+message GetRoomInfoRequest {
+  bytes room_id = 1;
+  bytes encryption_public_key = 2;
+  Ed25519Signature signature = 4;
+}
+
+message GetRoomInfoResponse {
+  RoomInfo room_info = 1;
+}
+// --------------------------------------------------------- //
+
+// region DeleteRoom
+// Deletes all exists room's data on server
+
+message DeleteRoomRequest {
+  bytes room_id = 1;
+  Ed25519Signature signature = 2;
+}
+// --------------------------------------------------------- //
+
+// region SendMessage
+// Sends message to room by room_id
+
+message SendMessageRequest {
+  bytes room_id = 1;
+  Message message = 2;
+  Ed25519Signature signature = 4;
+}
+// --------------------------------------------------------- //
+
+// region GetMessagesStream
+// Gets messages stream from room by room_id
+
+message GetMessagesStreamRequest {
+  bytes room_id = 1;
+  Ed25519Signature signature = 2;
+}
+
+message GetMessagesStreamResponse {
+  Message message = 1;
+}
+// --------------------------------------------------------- //
+
+// region UploadFile
+// Uploads file
+
+message UploadFileRequest {
+  repeated bytes receivers = 1;
+  FileChunk file_chunk = 2;
+}
+
+message UploadFileResponse {
+  bytes file_id = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}
+// --------------------------------------------------------- //
+
+// region DownloadFile
+// Downloads file by file_id
+
+message DownloadFileRequest {
+  bytes file_id = 1;
+  Ed25519Signature signature = 2;
+}
+
+message DownloadFileResponse {
+  FileChunk file_chunk = 1;
+}
+// --------------------------------------------------------- //
