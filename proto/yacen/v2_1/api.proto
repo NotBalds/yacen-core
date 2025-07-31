@@ -1,0 +1,306 @@
+syntax = "proto3";
+
+package yacen_api.v2_1;
+
+import "google/protobuf/timestamp.proto";
+
+// --------------------------------------------------------- //
+// region Authentication via gRPC Metadata
+//
+// All requests and responses in this API are cryptographically authenticated
+// using Ed25519 signatures passed through gRPC metadata headers.
+//
+// Client behavior (on every request):
+// - Serialize the request body using protobuf encoding.
+// - Sign the serialized body using Ed25519 private key.
+// - Encode both the signature and public key using base64.
+// - Attach them to gRPC metadata headers:
+//   - "signature": base64(Ed25519 signature)
+//   - "pubkey":    base64(PublicKey[32])
+//
+// Server behavior (on request):
+// - Extract "pubkey" and "signature" from metadata headers.
+// - Verify that the signature matches the serialized protobuf request body.
+//
+// Response behavior:
+// - Server may also include its own signature and public key
+//   in the response metadata using the same "signature" and "pubkey" headers.
+//
+// This mechanism ensures message integrity, authenticity, and
+// supports stateless identity verification without sessions or tokens.
+//
+// Example client-side implementation is based on:
+// - tonic::Request
+// - prost::Message
+// - ed25519_dalek::Signer / Verifier
+//
+// See: `sign_request` and `verify_response` in Rust for reference.
+//
+// --------------------------------------------------------- //
+// Service: Yacen
+//
+// All RPCs in this service require the client to sign the full request message
+// and include their public key and signature in the gRPC metadata.
+// See authentication notes above.
+
+service Yacen {
+  // Room Base
+  rpc CreateRoom (CreateRoomReq) returns (CreateRoomRes);
+  rpc GetRoomInfo (GetRoomInfoReq) returns (GetRoomInfoRes);
+  rpc DeleteRoom (DeleteRoomReq) returns (DeleteRoomRes);
+
+  // Non-Members and upper
+  rpc RequestJoinRoom (RequestJoinRoomReq) returns (RequestJoinRoomRes);
+  rpc GetJoinRequestStatus (GetJoinRequestStatusReq) returns (GetJoinRequestStatusRes);
+
+  // Members and upper
+  rpc SendMessage (SendMessageReq) returns (SendMessageRes);
+  rpc GetMessages (GetMessageReq) returns (stream GetMessageRes);
+  rpc UploadFile (stream UploadFileReq) returns (UploadFileRes);
+  rpc DownloadFile (DownloadFileReq) returns (stream DownloadFileRes);
+  
+  // Extended Rights and upper
+  rpc ApproveJoinRequest (ApproveJoinRequestReq) returns (ApproveJoinRequestRes);
+
+  // Admin & Owner
+  rpc GiveExtendedRights (GiveExtendedRightsReq) returns (GiveExtendedRightsRes);
+  rpc RemoveExtendedRights (RemoveExtendedRightsReq) returns (RemoveExtendedRightsRes);
+}
+// --------------------------------------------------------- //
+// region Security
+
+message MessageUniqueID {
+  bytes nonce = 1; // bytes[24]
+  google.protobuf.Timestamp timestamp = 2;
+}
+
+message Ed25519Signature {
+  bytes signature = 1; // 64 bytes ed25519 signature
+  string public_key = 2;
+}
+
+// --------------------------------------------------------- //
+// region Room
+
+enum RoomType {
+  ROOM_TYPE_COMMON = 0;
+  ROOM_TYPE_CHANNEL = 1;
+  reserved 2 to 5;
+}
+
+message RoomInfoPublic {
+  bytes encrypted_room_name = 1; // bytes(enc(AES_256_GCM, room_name))
+  bytes encrypted_room_description = 2; // bytes(enc(AES_256_GCM, room_description))
+  RoomType room_type = 3; // RoomType enum members
+  reserved 4 to 6;
+}
+
+message RoomInfoPrivate {
+  repeated string extended_rights_public_keys = 1; // same key fmt as in meta ( base64(bytes[32]) ); default only owner
+  repeated string allowed_public_keys = 2; // same key fmt as in meta ( base64(bytes[32]) ); default only owner
+  repeated string pending_join_requests = 3; // default empty
+  reserved 4 to 6;
+}
+
+// --------------------------------------------------------- //
+// region CreateRoom
+
+message CreateRoomReq {
+  RoomInfoPublic public_info = 1;
+  MessageUniqueID muid = 5;
+}
+
+message CreateRoomRes {
+  string room_id = 1; // hex( bytes[32] )
+  MessageUniqueID muid = 5;
+}
+
+// --------------------------------------------------------- //
+// region RequestJoinRoom
+
+message RequestJoinRoomReq {
+  string room_id = 1; // hex( bytes[32] )
+  string ecies_public_key = 2; // base64( bytes_pubkey )
+  MessageUniqueID muid = 5;
+}
+
+message RequestJoinRoomRes {
+  string join_request_id = 1;
+  MessageUniqueID muid = 5;
+}
+
+// --------------------------------------------------------- //
+// region ApproveJoinRequest
+
+message ApproveJoinRequestReq {
+  string join_request_id = 1;
+  string ecies_encrypted_room_key = 2;
+  MessageUniqueID muid = 5;
+}
+
+message ApproveJoinRequestRes {
+  MessageUniqueID muid = 5;
+}
+
+// --------------------------------------------------------- //
+// region GetJoinRequestStatus
+
+message GetJoinRequestStatusReq {
+  string join_request_id = 1;
+  MessageUniqueID muid = 5;
+}
+
+enum JoinRequestStatus {
+  JOIN_REQUEST_STATUS_DENIED = 0;
+  JOIN_REQUEST_STATUS_PENDING = 1;
+  JOIN_REQUEST_STATUS_APPROVED = 2;
+}
+
+message GetJoinRequestStatusRes {
+  JoinRequestStatus status = 1;
+  optional string ecies_encrypted_room_key = 2;
+  MessageUniqueID muid = 5;
+}
+
+// --------------------------------------------------------- //
+// region GetRoomInfo
+
+message GetRoomInfoReq {
+  string room_id = 1; // hex( bytes[32] )
+  MessageUniqueID muid = 5;
+}
+
+message GetRoomInfoRes {
+  RoomInfoPublic public_info = 1;
+  optional RoomInfoPrivate private_info = 2; // only if sender is owner
+  MessageUniqueID muid = 5;
+}
+
+// --------------------------------------------------------- //
+// region UpdateRoomInfo
+
+message UpdateRoomInfoReq {
+  string room_id = 1;
+  RoomInfoPublic public_info = 2;
+  MessageUniqueID muid = 5;
+}
+
+message UpdateRoomInfoRes {
+  MessageUniqueID muid = 5;
+}
+
+// --------------------------------------------------------- //
+// region DeleteRoom
+
+message DeleteRoomReq {
+  string room_id = 1; // hex( bytes[32] )
+  MessageUniqueID muid = 5;
+}
+
+message DeleteRoomRes {
+  MessageUniqueID muid = 5;
+}
+
+// --------------------------------------------------------- //
+// region GiveExtendedRights
+
+message GiveExtendedRightsReq { // only owner could do it
+  repeated string target_pubkeys = 1;
+  MessageUniqueID muid = 5;
+}
+
+message GiveExtendedRightsRes {
+  MessageUniqueID muid = 5;
+}
+
+// --------------------------------------------------------- //
+// region RemoveExtendedRights
+
+message RemoveExtendedRightsReq { // only owner could do it
+  repeated string target_pubkeys = 1;
+  MessageUniqueID muid = 5;
+}
+
+message RemoveExtendedRightsRes {
+  MessageUniqueID muid = 5;
+}
+
+// --------------------------------------------------------- //
+// region Message
+
+message Message {
+  oneof payload {
+    bytes encrypted_text = 1;
+    bytes encrypted_file_id = 2; // 
+  }
+  MessageUniqueID muid = 5;
+}
+
+// --------------------------------------------------------- //
+// region SendMessages
+
+message SendMessageReq {
+  string room_id = 1;
+  Message message = 2;
+  Ed25519Signature signature = 3; // 64 bytes ed25519 signature of encoded Message protobuf-object
+} // Here MUID is included in message field. Server should check MUID located in Message
+
+message SendMessageRes {
+  MessageUniqueID muid = 5;
+}
+
+// --------------------------------------------------------- //
+// region GetMessage
+
+message GetMessageReq {
+  string room_id = 1;
+  MessageUniqueID muid = 5;
+}
+
+message GetMessageRes {
+  Message message = 1; // Here is MUID which is has original date and nonce from sender to match the signature
+  Ed25519Signature signature = 2; // 64 bytes ed25519 signature of encoded Message protobuf-object
+  MessageUniqueID muid = 5; // Here is another MUID but it has actual date and new nonce. It belongs to server verification
+}
+
+// --------------------------------------------------------- //
+// region File
+
+message FileChunk {
+  int32 chunk_id = 1;
+  int32 chunk_count = 2;
+  bytes encrypted_data = 3;
+  reserved 4;
+  MessageUniqueID muid = 5;
+}
+
+// --------------------------------------------------------- //
+// region UploadFile
+
+message UploadFileReq {
+  string room_id = 1;
+  FileChunk chunk = 2;
+  Ed25519Signature chunk_signature = 3; // signature of FileChunk 
+}
+
+message UploadFileRes {
+  string file_id = 1; // hex( bytes[32] )
+  google.protobuf.Timestamp expires_at = 2;
+  MessageUniqueID muid = 5;
+}
+
+// --------------------------------------------------------- //
+// region DownloadFile
+
+message DownloadFileReq {
+  string file_id = 1;
+  MessageUniqueID muid = 5;
+}
+
+message DownloadFileRes {
+  FileChunk chunk = 1; // Here is MUID which is has original date and nonce from sender to match the signature
+  Ed25519Signature chunk_signature = 2;
+  MessageUniqueID muid = 5; // Here is another MUID but it has actual date and new nonce. It belongs to server verification
+}
+
+// --------------------------------------------------------- //
