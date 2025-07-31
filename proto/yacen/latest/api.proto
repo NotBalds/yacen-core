@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package yacen_api.v2_0;
+package yacen_api.v2_1;
 
 import "google/protobuf/timestamp.proto";
 
@@ -98,7 +98,7 @@ message RoomInfoPublic {
 message RoomInfoPrivate {
   repeated string extended_rights_public_keys = 1; // same key fmt as in meta ( base64(bytes[32]) ); default only owner
   repeated string allowed_public_keys = 2; // same key fmt as in meta ( base64(bytes[32]) ); default only owner
-  repeated string pending_public_keys = 3; // default empty
+  repeated string pending_join_requests = 3; // default empty
   reserved 4 to 6;
 }
 
