@@ -1,6 +1,6 @@
 pub mod api {
-    pub const VERSION: &str = "v2_1";
-    tonic::include_proto!("yacen_api.v2_1");
+    pub const VERSION: &str = "v2_2";
+    tonic::include_proto!("yacen_api.v2_2");
 }
 
 pub mod impls;
