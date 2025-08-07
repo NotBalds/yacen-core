@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-pub const KEYPAIR_BYTES_LENGTH: u8 = 83;
+pub const KEYPAIR_BYTES_LENGTH: usize = 83;
 
 #[derive(Serialize, Deserialize)]
 pub struct Identity {
