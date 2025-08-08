@@ -1,6 +1,6 @@
 use ring::rand::SystemRandom;
-pub use ring::signature::KeyPair;
 use ring::signature::{Ed25519KeyPair, UnparsedPublicKey};
+pub use ring::signature::{KeyPair, ED25519_PUBLIC_KEY_LEN};
 
 pub fn generate() -> anyhow::Result<Vec<u8>> {
     let rng = SystemRandom::new();
