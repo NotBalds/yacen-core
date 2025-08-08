@@ -1,6 +1,6 @@
 use crate::security::ed25519::ED25519_PUBLIC_KEY_LEN;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
 
 pub const KEYPAIR_BYTES_LENGTH: usize = 83;
 pub const LOCAL_KEY_BYTES_LENGTH: usize = 32;
